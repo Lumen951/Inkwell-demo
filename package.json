@@ -116,7 +116,7 @@
     "@opensumi/ide-output": "3.6.4",
     "@opensumi/ide-overlay": "3.6.4",
     "@opensumi/ide-preferences": "3.6.4",
-    "@opensumi/ide-process": "3.6.4",
+    "@opensumi/ide-process": "3.7.0",
     "@opensumi/ide-quick-open": "3.6.4",
     "@opensumi/ide-remote-opener": "3.6.4",
     "@opensumi/ide-scm": "3.6.4",
