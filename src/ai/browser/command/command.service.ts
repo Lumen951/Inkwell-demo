@@ -1,17 +1,44 @@
-import differenceWith from 'lodash/differenceWith';
+/**
+ * AICommandService类用于处理与AI命令相关的逻辑，包括命令分类、请求模型响应等功能。
+ * 
+ * ⚙️ 功能描述：
+ * - 该类负责管理命令组，处理用户输入的命令，并与AI服务交互以获取相应的命令或设置。
+ * 
+ * 🔧 配置项：
+ * - commandGroups: 存储内部命令组的映射关系。
+ * - commandRequestStep: 每次请求分类命令的步长，默认为50。
+ * 
+ * ⚠️ 注意事项：
+ * - 确保在使用该服务之前，已正确配置AI服务和命令注册服务。
+ */
 
-import { Autowired, Injectable } from '@opensumi/di';
+import differenceWith from 'lodash/differenceWith'; // 引入lodash库中的differenceWith函数，用于比较两个数组的差异
+
+import { Autowired, Injectable } from '@opensumi/di'; // 引入依赖注入相关的装饰器
 import {
   AIBackSerivcePath,
   Command,
   CommandRegistry,
-  CommandService, Deferred, IAIBackService, IAIBackServiceOption, IAIBackServiceResponse, ILoggerManagerClient, ILogServiceClient, SupportLogNamespace
-} from '@opensumi/ide-core-common';
-import { PreferenceService } from '@opensumi/ide-core-browser';
-import { IFileServiceClient } from '@opensumi/ide-file-service';
+  CommandService, 
+  Deferred, 
+  IAIBackService, 
+  IAIBackServiceOption, 
+  IAIBackServiceResponse, 
+  ILoggerManagerClient, 
+  ILogServiceClient, 
+  SupportLogNamespace
+} from '@opensumi/ide-core-common'; // 引入核心命令相关的类型和服务
+import { PreferenceService } from '@opensumi/ide-core-browser'; // 引入偏好设置服务
+import { IFileServiceClient } from '@opensumi/ide-file-service'; // 引入文件服务客户端
 
-import { AICommandPromptManager } from './command-prompt-manager';
+import { AICommandPromptManager } from './command-prompt-manager'; // 引入AI命令提示管理器
 
+/**
+ * 内部命令组的定义，包含不同类别的命令。
+ * 
+ * 🔧 配置项说明：
+ * - 每个键对应一个命令组，值为该组下的命令数组。
+ */
 const InnerCommandGroups: { [key in string]: string[] } = {
   'File and Editor Management': [
     'file.new.untitled',
@@ -602,130 +629,195 @@ const InnerCommandGroups: { [key in string]: string[] } = {
   ],
 };
 
+/**
+ * ISumiCommandModelResp接口定义了AI模型响应的命令类型。
+ * 
+ * 🔧 参数说明：
+ * - type: 'command' - 表示该响应为命令类型。
+ * - commandKey: string - 命令的唯一标识符。
+ * - answer: string - AI的回答内容。
+ */
 export interface ISumiCommandModelResp {
   type: 'command';
   commandKey: string;
   answer: string;
 }
 
+/**
+ * ISumiSettingModelResp接口定义了AI模型响应的设置类型。
+ * 
+ * 🔧 参数说明：
+ * - type: 'setting' - 表示该响应为设置类型。
+ * - settingKey: string - 设置的唯一标识符。
+ * - answer: string - AI的回答内容。
+ */
 export interface ISumiSettingModelResp {
   type: 'setting';
   settingKey: string;
   answer: string;
 }
 
+/**
+ * INullModelResp接口定义了AI模型响应的空类型。
+ * 
+ * 🔧 参数说明：
+ * - type: 'null' - 表示该响应为空类型。
+ * - answer: string - AI的回答内容。
+ */
 export interface INullModelResp {
   type: 'null';
   answer: string;
 }
 
+/**
+ * ISumiModelResp类型定义了AI模型响应的联合类型。
+ * 
+ * 🔧 类型说明：
+ * - 包含ISumiCommandModelResp、ISumiSettingModelResp和INullModelResp三种类型。
+ */
 export type ISumiModelResp = ISumiCommandModelResp | ISumiSettingModelResp | INullModelResp;
 
-@Injectable()
+@Injectable() // 使用@Injectable装饰器标记该类为可注入的服务
 export class AICommandService {
-  private commandGroups = InnerCommandGroups;
-  // for split command, too much will out of prompt tokens
-  protected commandRequestStep = 50;
+  private commandGroups = InnerCommandGroups; // 存储内部命令组
+  protected commandRequestStep = 50; // 每次请求分类命令的步长
 
-  private classifyCommandDeferred: Deferred<void> | null = null
+  private classifyCommandDeferred: Deferred<void> | null = null; // 用于延迟处理命令分类的Deferred对象
 
-  @Autowired(AIBackSerivcePath)
-  private aiBackService: IAIBackService;
+  @Autowired(AIBackSerivcePath) // 自动注入AI后端服务路径
+  private aiBackService: IAIBackService; // AI后端服务
 
-  @Autowired(CommandService)
-  protected readonly commandService: CommandService;
+  @Autowired(CommandService) // 自动注入命令服务
+  protected readonly commandService: CommandService; // 命令服务
 
-  @Autowired(CommandRegistry)
-  protected readonly commandRegistryService: CommandRegistry;
+  @Autowired(CommandRegistry) // 自动注入命令注册服务
+  protected readonly commandRegistryService: CommandRegistry; // 命令注册服务
 
-  @Autowired(IFileServiceClient)
-  protected fileService: IFileServiceClient;
+  @Autowired(IFileServiceClient) // 自动注入文件服务客户端
+  protected fileService: IFileServiceClient; // 文件服务客户端
 
-  @Autowired(AICommandPromptManager)
-  protected promptManager: AICommandPromptManager;
+  @Autowired(AICommandPromptManager) // 自动注入AI命令提示管理器
+  protected promptManager: AICommandPromptManager; // AI命令提示管理器
 
-  @Autowired(ILoggerManagerClient)
-  private readonly loggerManagerClient: ILoggerManagerClient;
+  @Autowired(ILoggerManagerClient) // 自动注入日志管理客户端
+  private readonly loggerManagerClient: ILoggerManagerClient; // 日志管理客户端
 
-  @Autowired(PreferenceService)
-  preferenceService: PreferenceService;
+  @Autowired(PreferenceService) // 自动注入偏好设置服务
+  preferenceService: PreferenceService; // 偏好设置服务
 
-  protected logger: ILogServiceClient;
-  // 用来记录查找失败的，因为用 any，在 catch 里不好处理，加个变量记录下
-  private findCommandRequestErrorCode = 0;
+  protected logger: ILogServiceClient; // 日志服务客户端
+  private findCommandRequestErrorCode = 0; // 用于记录查找命令时的错误代码
 
   constructor() {
-    this.logger = this.loggerManagerClient.getLogger(SupportLogNamespace.Browser);
+    this.logger = this.loggerManagerClient.getLogger(SupportLogNamespace.Browser); // 初始化日志服务
   }
 
+  /**
+   * 向AI模型发送请求以获取响应。
+   * 
+   * 🔧 参数说明：
+   * - prompt: string - 要发送的提示信息。
+   * 
+   * 🚀 返回值说明：
+   * - Promise<IAIBackServiceResponse<IAIBackServiceOption & { maxTokens: number }>> - AI模型的响应。
+   */
   async requestToModel(prompt: string) {
     return this.aiBackService.request<IAIBackServiceOption & { maxTokens: number }>(prompt, { maxTokens: 2000 });
   }
 
+  /**
+   * 分类命令，识别未分组的命令并请求AI进行分类。
+   * 
+   * 🚀 返回值说明：
+   * - Promise<void> - 无返回值，异步执行。
+   */
   async classifyCommand() {
     const allCommand = this.commandRegistryService
       .getCommands()
-      .filter((command) => command.labelLocalized?.localized || command.label);
+      .filter((command) => command.labelLocalized?.localized || command.label); // 获取所有命令并过滤
+
     const innerCommands = Object.keys(this.commandGroups).reduce(
       (array, curGroup) => array.concat(this.commandGroups[curGroup]),
       [] as string[],
-    );
+    ); // 获取所有内部命令
+
     const unGroupCommands = differenceWith(
       allCommand,
       innerCommands,
       (command, innerCommand) => command.id === innerCommand,
-    );
+    ); // 找到未分组的命令
 
     if (unGroupCommands.length) {
       const partCommands = Array.from(
         { length: Math.round(unGroupCommands.length / this.commandRequestStep) || 1 },
         (_, index) => index,
-      ).map((i) => unGroupCommands.slice(i * this.commandRequestStep, (i + 1) * this.commandRequestStep));
+      ).map((i) => unGroupCommands.slice(i * this.commandRequestStep, (i + 1) * this.commandRequestStep)); // 将未分组命令分块
 
       for (const commands of partCommands) {
-        await this.requestForClassifyCommand(commands);
+        await this.requestForClassifyCommand(commands); // 请求分类
       }
     }
   }
 
+  /**
+   * 一次性分类命令，确保只执行一次分类操作。
+   * 
+   * 🚀 返回值说明：
+   * - Promise<Deferred<void>> - 返回一个Deferred对象。
+   */
   async classifyCommandOnce() {
     if (!this.classifyCommandDeferred) {
-      this.classifyCommandDeferred = new Deferred()
+      this.classifyCommandDeferred = new Deferred(); // 初始化Deferred对象
       try {
-        await this.classifyCommand()
+        await this.classifyCommand(); // 执行分类命令
       } finally {
-        this.classifyCommandDeferred.resolve()
+        this.classifyCommandDeferred.resolve(); // 解析Deferred对象
       }
     }
-    return this.classifyCommandDeferred
+    return this.classifyCommandDeferred; // 返回Deferred对象
   }
 
+  /**
+   * 请求AI对给定命令进行分类。
+   * 
+   * 🔧 参数说明：
+   * - commands: Command[] - 要分类的命令数组。
+   * 
+   * 🚀 返回值说明：
+   * - Promise<void> - 无返回值，异步执行。
+   */
   async requestForClassifyCommand(commands: Command[]) {
-    const prompt = this.promptManager.groupCommand(commands.map((c) => c.id).join(','));
-    const groupReply = await this.requestToModel(prompt);
+    const prompt = this.promptManager.groupCommand(commands.map((c) => c.id).join(',')); // 生成分组命令的提示
+    const groupReply = await this.requestToModel(prompt); // 请求AI模型
 
     const groupReg = new RegExp(
       `\\[(?<groupName>${Object.keys(this.commandGroups).join('|')})\\]:\\s?(?<commandList>.*)`,
-    );
+    ); // 正则表达式用于匹配命令组
 
-    const groupArray = groupReply.data?.split('\n') || [];
+    const groupArray = groupReply.data?.split('\n') || []; // 分割AI返回的命令组
     groupArray.forEach((groupLine) => {
-      const match = groupReg.exec(groupLine);
+      const match = groupReg.exec(groupLine); // 匹配命令组
       if (match && match.groups?.commandList) {
         const { groupName, commandList } = match.groups || {};
-        const commandArray = commandList.split(',');
+        const commandArray = commandList.split(','); // 分割命令列表
         this.commandGroups[groupName] = this.commandGroups[groupName]
-          ? this.commandGroups[groupName].concat(commandArray)
-          : commandArray;
+          ? this.commandGroups[groupName].concat(commandArray) // 合并命令
+          : commandArray; // 初始化命令组
       }
     });
   }
 
+  /**
+   * 根据用户输入获取AI模型的响应。
+   * 
+   * 🔧 参数说明：
+   * - input: string - 用户输入的命令。
+   * 
+   * 🚀 返回值说明：
+   * - Promise<IAIBackServiceResponse<ISumiModelResp>> - AI模型的响应。
+   */
   public async getModelResp(input: string): Promise<IAIBackServiceResponse<ISumiModelResp>> {
-    /**
-     * 先直接使用 input 进行 command 的匹配
-     */
-    const inputMatchedCommand = this.searchWithoutAI(input);
+    const inputMatchedCommand = this.searchWithoutAI(input); // 直接匹配输入的命令
 
     if (inputMatchedCommand) {
       const { labelLocalized, label, id } = inputMatchedCommand;
@@ -739,14 +831,14 @@ export class AICommandService {
       };
     }
 
-    await this.classifyCommandOnce()
+    await this.classifyCommandOnce(); // 确保命令已分类
 
-    const modelReply = await this.searchCommand(input)
+    const modelReply = await this.searchCommand(input); // 搜索命令
     if (modelReply.errorCode || !modelReply.data) {
-      this.logger.error('[agent] IDE agent failed: ', modelReply.errorCode);
+      this.logger.error('[agent] IDE agent failed: ', modelReply.errorCode); // 记录错误
 
       if (!modelReply.errorMsg) {
-        modelReply.errorMsg = 'AI 模型调用失败';
+        modelReply.errorMsg = 'AI 模型调用失败'; // 设置默认错误信息
       }
 
       return {
@@ -763,7 +855,6 @@ export class AICommandService {
     let sumiData: ISumiModelResp = { type: 'null', answer: data.label! };
 
     if (data.id) {
-      // 在 command 中查找对应的 key
       if (this.commandRegistryService.getCommand(data.id)) {
         sumiData = {
           type: 'command',
@@ -772,7 +863,6 @@ export class AICommandService {
         };
       }
 
-      // 在 settings 中查找对应的 key
       if ((this.preferenceService as any).has(data.id)) {
         sumiData = {
           type: 'setting',
@@ -782,99 +872,154 @@ export class AICommandService {
       }
     }
 
-    return { ...modelReply, data: sumiData };
+    return { ...modelReply, data: sumiData }; // 返回AI模型的响应
   }
 
+  /**
+   * 根据用户输入搜索命令。
+   * 
+   * 🔧 参数说明：
+   * - input: string - 用户输入的命令。
+   * 
+   * 🚀 返回值说明：
+   * - Promise<IAIBackServiceResponse<Command>> - AI模型的响应。
+   */
   public async searchCommand(input: string): Promise<IAIBackServiceResponse<Command>> {
-    this.findCommandRequestErrorCode = 0;
+    this.findCommandRequestErrorCode = 0; // 重置错误代码
 
-    const command = this.searchWithoutAI(input);
+    const command = this.searchWithoutAI(input); // 搜索未使用AI的命令
     if (command) {
-      return { data: command };
+      return { data: command }; // 返回找到的命令
     }
 
     try {
-      return this.searchGroup(input);
+      return this.searchGroup(input); // 搜索命令组
     } catch {
-      return { errorCode: 1 };
+      return { errorCode: 1 }; // 返回错误代码
     }
   }
 
+  /**
+   * 在命令注册服务中查找与输入匹配的命令。
+   * 
+   * 🔧 参数说明：
+   * - input: string - 用户输入的命令。
+   * 
+   * 🚀 返回值说明：
+   * - Command | undefined - 返回找到的命令或未定义。
+   */
   private searchWithoutAI(input: string) {
     return this.commandRegistryService
       .getCommands()
-      .find((command) => command.labelLocalized?.localized === input || command.label === input);
+      .find((command) => command.labelLocalized?.localized === input || command.label === input); // 查找匹配的命令
   }
 
+  /**
+   * 根据用户输入搜索命令组。
+   * 
+   * 🔧 参数说明：
+   * - input: string - 用户输入的命令。
+   * 
+   * 🚀 返回值说明：
+   * - Promise<IAIBackServiceResponse<Command>> - AI模型的响应。
+   */
   public async searchGroup(input: string) {
-    const enPrompt = this.promptManager.searchGroup(input, { useCot: true });
+    const enPrompt = this.promptManager.searchGroup(input, { useCot: true }); // 生成搜索组的提示
 
-    const groupReply = await this.requestToModel(enPrompt);
+    const groupReply = await this.requestToModel(enPrompt); // 请求AI模型
 
     if (groupReply?.errorCode) {
-      return { errorCode: groupReply.errorCode, errorMsg: groupReply.errorMsg };
+      return { errorCode: groupReply.errorCode, errorMsg: groupReply.errorMsg }; // 返回错误信息
     }
 
-    const groups = Object.keys(this.commandGroups);
-    const groupReg = new RegExp(`(?<group>${groups.join('|')})`);
-    const match = groupReg.exec(groupReply.data || '');
-    const group = match && match.groups?.group;
+    const groups = Object.keys(this.commandGroups); // 获取命令组
+    const groupReg = new RegExp(`(?<group>${groups.join('|')})`); // 正则表达式匹配命令组
+    const match = groupReg.exec(groupReply.data || ''); // 匹配命令组
+    const group = match && match.groups?.group; // 获取匹配的组
 
-    return this.findCommand(input, group);
+    return this.findCommand(input, group); // 查找命令
   }
 
+  /**
+   * 查找指定组中的命令。
+   * 
+   * 🔧 参数说明：
+   * - input: string - 用户输入的命令。
+   * - group?: string | null - 可选的命令组。
+   * 
+   * 🚀 返回值说明：
+   * - Promise<IAIBackServiceResponse<Command>> - AI模型的响应。
+   */
   public async findCommand(input: string, group?: string | null): Promise<IAIBackServiceResponse<Command>> {
-    const commandsInGroup = this.commandGroups[group || ''];
+    const commandsInGroup = this.commandGroups[group || '']; // 获取指定组中的命令
 
     if (!commandsInGroup) {
-      return { errorCode: 0 };
+      return { errorCode: 0 }; // 返回错误代码
     }
 
     const commands = this.commandRegistryService
       .getCommands()
-      .filter((c) => commandsInGroup.includes(c.id) || (c.delegate && commandsInGroup.includes(c.delegate)));
+      .filter((c) => commandsInGroup.includes(c.id) || (c.delegate && commandsInGroup.includes(c.delegate))); // 过滤命令
 
     const partCommands = Array.from(
       { length: Math.round(commands.length / this.commandRequestStep) },
       (_, index) => index,
-    ).map((i) => commands.slice(i * this.commandRequestStep, (i + 1) * this.commandRequestStep));
+    ).map((i) => commands.slice(i * this.commandRequestStep, (i + 1) * this.commandRequestStep)); // 将命令分块
 
     try {
-      // @ts-ignore
-      const command = await Promise.any(partCommands.map((c) => this.requestCommand(c, input)));
+      const command = await Promise.any(partCommands.map((c) => this.requestCommand(c, input))); // 请求命令
 
-      return { data: commands.find((c) => c.id === command?.data) };
+      return { data: commands.find((c) => c.id === command?.data) }; // 返回找到的命令
     } catch (e: any) {
-      this.logger.error('Find command failed: ', e.message);
-      return { errorCode: this.findCommandRequestErrorCode };
+      this.logger.error('Find command failed: ', e.message); // 记录错误
+      return { errorCode: this.findCommandRequestErrorCode }; // 返回错误代码
     }
   }
 
+  /**
+   * 请求特定命令的响应。
+   * 
+   * 🔧 参数说明：
+   * - commands: Command[] - 要请求的命令数组。
+   * - question: string - 用户提问。
+   * 
+   * 🚀 返回值说明：
+   * - Promise<{ data: string }> - 返回找到的命令。
+   */
   private async requestCommand(commands: Command[], question: string) {
     const prompt = this.promptManager.findCommand({
-      commands: commands.map((c) => `{${c.id}}-{${c.labelLocalized?.localized! || c.label || ''}}`).join('\n'),
+      commands: commands.map((c) => `{${c.id}}-{${c.labelLocalized?.localized! || c.label || ''}}`).join('\n'), // 生成命令提示
       question,
     });
 
-    const commandReply = await this.requestToModel(prompt);
+    const commandReply = await this.requestToModel(prompt); // 请求AI模型
 
     if (commandReply.errorCode) {
-      this.findCommandRequestErrorCode = commandReply.errorCode;
+      this.findCommandRequestErrorCode = commandReply.errorCode; // 记录错误代码
     }
 
-    const answerCommand = this.matchCommand(commandReply.data || '');
+    const answerCommand = this.matchCommand(commandReply.data || ''); // 匹配命令
 
     if (answerCommand && commands.find((c) => c.id === answerCommand)) {
-      return { data: answerCommand };
+      return { data: answerCommand }; // 返回找到的命令
     }
 
-    await Promise.reject('Command not found');
+    await Promise.reject('Command not found'); // 拒绝Promise
   }
 
+  /**
+   * 匹配AI模型返回的命令。
+   * 
+   * 🔧 参数说明：
+   * - answer: string - AI模型的回答。
+   * 
+   * 🚀 返回值说明：
+   * - string - 匹配到的命令。
+   */
   private matchCommand(answer: string): string {
-    const commandReg = /`(?<command>\S+)`/;
-    const command = commandReg.exec(answer);
+    const commandReg = /`(?<command>\S+)`/; // 正则表达式匹配命令
+    const command = commandReg.exec(answer); // 执行匹配
 
-    return command?.groups?.command || '';
+    return command?.groups?.command || ''; // 返回匹配的命令
   }
 }

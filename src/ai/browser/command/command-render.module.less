@@ -1,13 +1,24 @@
+/*
+ * 功能描述：定义聊天执行结果的样式，包括结果列表和执行按钮的布局与外观。
+ * 
+ * 参数说明：
+ * - 无
+ * 
+ * 返回值说明：
+ * - 无
+ */
+
 .chat_excute_result {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  padding-bottom: 4px;
+  display: flex; // 🔧 使用flex布局，使子元素能够灵活排列
+  flex-direction: column; // 🔧 设置主轴方向为列，子元素垂直排列
+  width: 100%; // 🔧 宽度占满父容器
+  padding-bottom: 4px; // 🔧 底部内边距，增加视觉间距
+
   .chat_result_list {
-    margin: 8px 0 12px;
+    margin: 8px 0 12px; // 🔧 设置上下外边距，确保列表与其他元素之间有适当的间隔
   }
 
   .chat_excute_btn {
-    border-radius: 8px;
+    border-radius: 8px; // 🔧 设置按钮圆角，提升视觉美感
   }
 }
