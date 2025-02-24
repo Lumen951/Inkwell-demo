@@ -1344,10 +1344,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@opensumi/ide-opened-editor@npm:3.6.4":
-  version: 3.6.4
-  resolution: "@opensumi/ide-opened-editor@npm:3.6.4"
-  checksum: 10/3f709c85dea6c05b2b13f2c5c5e9684cb1b266793ce585090ef1f36d1af92b680ca525edcb1a04d95e37199aa0217cb7b5e452afe2b4a9c499ad4c57d84cbe0a
+"@opensumi/ide-opened-editor@npm:3.7.1":
+  version: 3.7.1
+  resolution: "@opensumi/ide-opened-editor@npm:3.7.1"
+  checksum: 10/1bc550d1b80775c7d25902b02e98e4926b967b3eb24fae99dbad88e162f743687a2767d14f257255cdb5d4084848364d77829e42a4dda3b523c1c9f6e95b074c
   languageName: node
   linkType: hard
 
@@ -3946,7 +3946,7 @@ __metadata:
     "@opensumi/ide-menu-bar": "npm:3.6.4"
     "@opensumi/ide-monaco": "npm:3.6.4"
     "@opensumi/ide-monaco-enhance": "npm:3.6.4"
-    "@opensumi/ide-opened-editor": "npm:3.6.4"
+    "@opensumi/ide-opened-editor": "npm:3.7.1"
     "@opensumi/ide-outline": "npm:3.6.4"
     "@opensumi/ide-output": "npm:3.6.4"
     "@opensumi/ide-overlay": "npm:3.6.4"
