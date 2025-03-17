@@ -111,7 +111,7 @@
     "@opensumi/ide-menu-bar": "3.6.4",
     "@opensumi/ide-monaco": "3.6.4",
     "@opensumi/ide-monaco-enhance": "3.6.4",
-    "@opensumi/ide-opened-editor": "3.6.4",
+    "@opensumi/ide-opened-editor": "3.8.2",
     "@opensumi/ide-outline": "3.6.4",
     "@opensumi/ide-output": "3.6.4",
     "@opensumi/ide-overlay": "3.6.4",
